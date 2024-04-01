@@ -1,0 +1,74 @@
+import qrcode
+from PIL import Image
+
+def encode_data_into_qr(input_data, qr_filename, output_filename):
+    # Generate QR code with input data
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(input_data)
+    qr.make(fit=True)
+    qr_img = qr.make_image(fill_color="black", back_color="white")
+    
+    # Open QR code image as PIL Image
+    qr_img_pil = qr_img.convert("RGB")
+    qr_img_data = qr_img_pil.getdata()
+    qr_img_pixels = list(qr_img_data)
+    
+    # Embed data into QR code pixels (LSB substitution)
+    data = open(qr_filename, "rb").read()
+    data_len = len(data)
+    encoded = list(data) + [data_len >> 8, data_len & 255] + [ord(char) for char in input_data]
+    encoded.extend([0] * (len(qr_img_pixels) - len(encoded)))
+    encoded_index = 0
+    
+    for i in range(len(qr_img_pixels)):
+        pixel = list(qr_img_pixels[i])
+        for j in range(3):  # R, G, B
+            if encoded_index < len(encoded):
+                pixel[j] &= ~1  # Clear LSB
+                pixel[j] |= (encoded[encoded_index] >> 7) & 1
+                encoded[encoded_index] <<= 1
+                encoded_index += 1
+        qr_img_pixels[i] = tuple(pixel)
+    
+    # Create new QR code image with embedded data
+    qr_img_encoded = Image.new(qr_img_pil.mode, qr_img_pil.size)
+    qr_img_encoded.putdata(qr_img_pixels)
+    qr_img_encoded.save(output_filename)
+
+def decode_data_from_qr(qr_filename):
+    # Open QR code image as PIL Image
+    qr_img_pil = Image.open(qr_filename)
+    qr_img_data = qr_img_pil.getdata()
+    qr_img_pixels = list(qr_img_data)
+    
+    # Extract embedded data from QR code pixels (LSB extraction)
+    extracted = []
+    extracted_index = 0
+    
+    for i in range(len(qr_img_pixels)):
+        pixel = qr_img_pixels[i]
+        data_byte = 0
+        for j in range(3):  # R, G, B
+            data_byte = (data_byte << 1) | (pixel[j] & 1)
+        extracted.append(data_byte)
+        
+    # Retrieve length of embedded data
+    data_len = (extracted[-2] << 8) | extracted[-1]
+    
+    # Retrieve embedded data
+    extracted_data = bytearray(extracted[:data_len])
+    
+    return extracted_data.decode()
+
+# Example usage:
+input_data = "Secret message"
+qr_filename = "original_qr_code.png"
+output_filename = "encoded_qr_code.png"
+
+# Encode data into QR code
+encode_data_into_qr(input_data, qr_filename, output_filename)
+print("Data encoded into QR code successfully!")
+
+# Decode data from QR code
+decoded_data = decode_data_from_qr(output_filename)
+print("Decoded data from QR code:", decoded_data)

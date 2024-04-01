@@ -38,10 +38,10 @@ python decode.py --input encoded_qr_code.png
 
 ## Examples
 
-![Original QR Code](images/original_qr_code.png)
+
 *Original QR Code*
 
-![Encoded QR Code](images/encoded_qr_code.png)
+
 *QR Code with Hidden Message*
 
 
